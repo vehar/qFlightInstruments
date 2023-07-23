@@ -135,13 +135,16 @@ public:
     ///
     void setYaw(double val)
     {
+        if (val == m_yaw)
+            return;
+
         m_yaw = val;
         if (m_yaw < 0)
             m_yaw = 360 + m_yaw;
         if (m_yaw > 360)
             m_yaw = m_yaw - 360;
 
-        emit canvasReplot();
+        emit update();
     }
 
     ///
@@ -150,9 +153,12 @@ public:
     ///
     void setAlt(double val)
     {
+        if (val == m_alt)
+            return;
+
         m_alt = val;
 
-        emit canvasReplot();
+        emit update();
     }
 
     ///
@@ -161,9 +167,12 @@ public:
     ///
     void setH(double val)
     {
+        if (val == m_h)
+            return;
+
         m_h = val;
 
-        emit canvasReplot();
+        emit update();
     }
 
     ///
@@ -202,6 +211,10 @@ protected:
     double m_yaw; ///< yaw angle (in degree)
     double m_alt; ///< altitude (in m)
     double m_h;   ///< height from ground (in m)
+
+    double m_previousYaw = 0.0;
+    double m_previousAlt = 0.0;
+    double m_previousH = 0.0;
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -245,6 +258,9 @@ public:
     /// \brief Reloat data to table widget
     ///
     void listReload(void) { emit listUpdate(); }
+
+    void createOrUpdateItem(int row, int column, const QString &text, const QColor &foreground,
+                            const QColor &background);
 
 signals:
     void listUpdate(void);

@@ -260,13 +260,22 @@ void QCompass::resizeEvent(QResizeEvent *event) { m_size = qMin(width(), height(
 
 void QCompass::paintEvent(QPaintEvent *)
 {
+    //    if (m_alt == m_previousAlt && m_h == m_previousH && m_yaw == m_previousYaw)
+    //        return; // No data has changed, no need to repaint
+
     QPainter painter(this);
 
     QPen pen(Qt::white, 1);
+
     QFont smallFont("");
     smallFont.setPointSize(8);
+
     QFont bigFont(smallFont);
-    bigFont.setPointSizeF(8 * 1.3);
+    bigFont.setPointSizeF(8 * 1.5);
+
+    QFont boldFont("Helvetica", 14);
+    boldFont.bold();
+
     int fontSizePlusTwo = QFontMetrics(smallFont).height() + 2;
 
     painter.setRenderHint(QPainter::Antialiasing);
@@ -355,17 +364,22 @@ void QCompass::paintEvent(QPaintEvent *)
     pen.setWidth(2);
     pen.setColor(Qt::black);
     painter.setPen(pen);
-    painter.setBrush(Qt::white);
+    painter.setBrush(QColor(128, 128, 128, 240));
     painter.setFont(QFont("", 13));
     QRect altRect(-65, -13 - 8, 130, 2 * (13 + 8));
     painter.drawRoundedRect(altRect, 6, 6);
 
-    pen.setColor(Qt::blue);
+    pen.setColor(Qt::green);
     painter.setPen(pen);
+    painter.setFont(boldFont);
     painter.drawText(altRect.adjusted(0, 2, 0, -altRect.height() / 2), Qt::AlignCenter,
                      QString::asprintf("ALT: %6.1f m", m_alt));
     painter.drawText(altRect.adjusted(0, altRect.height() / 2, 0, 0), Qt::AlignCenter,
                      QString::asprintf("H: %6.1f m", m_h));
+
+    //    m_previousAlt = m_alt;
+    //    m_previousH = m_h;
+    //    m_previousYaw = m_yaw;
 }
 
 void QCompass::keyPressEvent(QKeyEvent *event)
@@ -426,75 +440,57 @@ QKeyValueListView::QKeyValueListView(QWidget *parent) : QTableWidget(parent)
     // disable table edit & focus
     setEditTriggers(QTableWidget::NoEditTriggers);
     setFocusPolicy(Qt::NoFocus);
+    setMinimumHeight(10);
 }
 
 QKeyValueListView::~QKeyValueListView() { delete m_mutex; }
 
+void QKeyValueListView::createOrUpdateItem(int row, int column, const QString &text,
+                                           const QColor &foreground, const QColor &background)
+{
+    const int fontSize = 8;
+
+    QTableWidgetItem *item = this->item(row, column);
+    if (item != nullptr)
+    {
+        item->setText(text);
+    }
+    else
+    {
+        item = new QTableWidgetItem();
+        item->setText(text);
+        item->setForeground(foreground);
+        item->setBackground(background);
+        item->setFont(QFont("", fontSize));
+        this->setItem(row, column, item);
+    }
+}
+
 void QKeyValueListView::listUpdate_slot(void)
 {
-    int i, n;
-    ListMap::iterator it;
+    QColor clCL1(0x00, 0x00, 0xFF);
+    QColor clCL2(0x00, 0x00, 0x00);
+    QColor clB1(0xFF, 0xFF, 0xFF);
+    QColor clB2(0xE0, 0xE0, 0xE0);
 
-    QColor clCL1, clCL2;
-    QColor clB1, clB2;
-
-    int fontSize = 8;
-    int rowHeight = 20;
-
-    clCL1 = QColor(0x00, 0x00, 0xFF);
-    clCL2 = QColor(0x00, 0x00, 0x00);
-    clB1 = QColor(0xFF, 0xFF, 0xFF);
-    clB2 = QColor(0xE0, 0xE0, 0xE0);
+    const int rowHeight = 10;
 
     m_mutex->lock();
 
-    n = m_data.size();
+    int n = m_data.size();
     setRowCount(n);
     setColumnCount(2);
 
-    for (i = 0, it = m_data.begin(); it != m_data.end(); i++, it++)
+    int i = 0;
+    for (auto it = m_data.begin(); it != m_data.end(); i++, it++)
     {
+        QColor background = (i % 2 == 0) ? clB1 : clB2;
+
         // set name cell
-        if (this->item(i, 0) != NULL)
-        {
-            this->item(i, 0)->setText(it.key());
-        }
-        else
-        {
-            QTableWidgetItem *item = new QTableWidgetItem();
-            item->setText(it.key());
-
-            item->setTextColor(clCL1);
-            if (i % 2 == 0)
-                item->setBackgroundColor(clB1);
-            else
-                item->setBackgroundColor(clB2);
-
-            item->setFont(QFont("", fontSize));
-
-            this->setItem(i, 0, item);
-        }
+        createOrUpdateItem(i, 0, it.key(), clCL1, background);
 
         // set value cell
-        if (this->item(i, 1) != NULL)
-        {
-            this->item(i, 1)->setText(it.value());
-        }
-        else
-        {
-            QTableWidgetItem *item = new QTableWidgetItem();
-            item->setText(it.value());
-
-            item->setTextColor(clCL2);
-            if (i % 2 == 0)
-                item->setBackgroundColor(clB1);
-            else
-                item->setBackgroundColor(clB2);
-
-            item->setFont(QFont("", fontSize));
-
-            this->setItem(i, 1, item);
-        }
+        createOrUpdateItem(i, 1, it.value(), clCL2, background);
 
         setRowHeight(i, rowHeight);
     }
