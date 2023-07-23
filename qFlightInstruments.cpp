@@ -40,81 +40,80 @@ void QADI::resizeEvent(QResizeEvent *event) { m_size = qMin(width(), height()) -
 
 void QADI::paintEvent(QPaintEvent *)
 {
+    const double PI = 3.1415926;
+    const int HALF_CIRCLE = 180;
+    const double FULL_CIRCLE = 360.0;
+    const double HALF_SIZE = m_size / 2;
+    const double SIZE_RATIO = HALF_SIZE / 45.0;
+    const double PITCH_TEM_RATIO = HALF_SIZE * -m_pitch / 45.0;
+    const int FONT_SIZE = 8;
+    const int ROLL_LINES = 36;
+    const double ROT_ANG = FULL_CIRCLE / ROLL_LINES;
+    const int ROLL_LINE_LEN = m_size / 25;
+
+    // Initialize pens, brushes, and QFont outside loops
     QPainter painter(this);
 
     QBrush bgSky(QColor(48, 172, 220));
     QBrush bgGround(QColor(247, 168, 21));
 
-    QPen whitePen(Qt::white);
-    QPen blackPen(Qt::black);
-    QPen pitchPen(Qt::white);
-    QPen pitchZero(Qt::green);
+    QPen whitePen(Qt::white, 2);
+    QPen blackPen(Qt::black, 2);
+    QPen pitchPen(Qt::white, 2);
+    QPen pitchZero(Qt::green, 3);
 
-    whitePen.setWidth(2);
-    blackPen.setWidth(2);
-    pitchZero.setWidth(3);
+    QFont font("", FONT_SIZE);
 
     painter.setRenderHint(QPainter::Antialiasing);
-
     painter.translate(width() / 2, height() / 2);
     painter.rotate(m_roll);
 
-    // FIXME: AHRS output left-hand values
     double pitch_tem = -m_pitch;
+
+    // Cache reused computations
+    double y_pitch = SIZE_RATIO * pitch_tem;
+    int y = std::clamp(y_pitch, SIZE_RATIO * -40.0, SIZE_RATIO * 40.0);
+    int x = sqrt(HALF_SIZE * HALF_SIZE - y * y);
+    double gr = atan((double)(y) / x) * HALF_CIRCLE / PI;
 
     // draw background
     {
-        int y_min, y_max;
-
-        y_min = m_size / 2 * -40.0 / 45.0;
-        y_max = m_size / 2 * 40.0 / 45.0;
-
-        int y = m_size / 2 * pitch_tem / 45.;
-        if (y < y_min)
-            y = y_min;
-        if (y > y_max)
-            y = y_max;
-
-        int x = sqrt(m_size * m_size / 4 - y * y);
-        qreal gr = atan((double)(y) / x);
-        gr = gr * 180. / 3.1415926;
-
         painter.setPen(blackPen);
         painter.setBrush(bgSky);
-        painter.drawChord(-m_size / 2, -m_size / 2, m_size, m_size, gr * 16, (180 - 2 * gr) * 16);
+        painter.drawChord(-HALF_SIZE, -HALF_SIZE, m_size, m_size, gr * 16,
+                          (HALF_CIRCLE - 2 * gr) * 16);
 
         painter.setBrush(bgGround);
-        painter.drawChord(-m_size / 2, -m_size / 2, m_size, m_size, gr * 16, -(180 + 2 * gr) * 16);
+        painter.drawChord(-HALF_SIZE, -HALF_SIZE, m_size, m_size, gr * 16,
+                          -(HALF_CIRCLE + 2 * gr) * 16);
     }
 
-    // set mask
-    QRegion maskRegion(-m_size / 2, -m_size / 2, m_size, m_size, QRegion::Ellipse);
+    QRegion maskRegion(-HALF_SIZE, -HALF_SIZE, m_size, m_size, QRegion::Ellipse);
     painter.setClipRegion(maskRegion);
 
     // draw pitch lines & marker
     {
-        int x, y, x1, y1;
-        int textWidth;
-        double p, r;
         int ll = m_size / 8, l;
-
-        int fontSize = 8;
         QString s;
+        s.reserve(4); // Pre-allocate string with enough memory
 
-        pitchPen.setWidth(2);
-        painter.setFont(QFont("", fontSize));
+        painter.setFont(font);
 
         // draw lines
         for (int i = -9; i <= 9; i++)
         {
-            p = i * 10;
+            int p = i * 10;
 
-            s = QString("%1").arg(-p);
+            s = QString::number(-p); // Prefer QString::number over arg
 
-            if (i % 3 == 0)
-                l = ll;
-            else
-                l = ll / 2;
+            l = (i % 3 == 0) ? ll : ll / 2;
+
+            int y = SIZE_RATIO * p - PITCH_TEM_RATIO;
+            int x = l;
+
+            int r = sqrt(x * x + y * y);
+            if (r > HALF_SIZE)
+                continue;
 
             if (i == 0)
             {
@@ -126,107 +125,80 @@ void QADI::paintEvent(QPaintEvent *)
                 painter.setPen(pitchPen);
             }
 
-            y = m_size / 2 * p / 45.0 - m_size / 2 * pitch_tem / 45.;
-            x = l;
-
-            r = sqrt(x * x + y * y);
-            if (r > m_size / 2)
-                continue;
-
             painter.drawLine(QPointF(-l, 1.0 * y), QPointF(l, 1.0 * y));
-
-            textWidth = 100;
 
             if (i % 3 == 0 && i != 0)
             {
-                painter.setPen(QPen(Qt::white));
-
-                x1 = -x - 2 - textWidth;
-                y1 = y - fontSize / 2 - 1;
-                painter.drawText(QRectF(x1, y1, textWidth, fontSize + 2),
+                painter.setPen(whitePen);
+                int x1 = -x - 2 - 100;
+                int y1 = y - FONT_SIZE / 2 - 1;
+                painter.drawText(QRectF(x1, y1, 100, FONT_SIZE + 2),
                                  Qt::AlignRight | Qt::AlignVCenter, s);
             }
         }
 
         // draw marker
         int markerSize = m_size / 20;
-        float fx1, fy1, fx2, fy2, fx3, fy3;
+        int halfMarkerSize = markerSize / 2;
+        int doublemarkerSize = markerSize * 2;
 
         painter.setBrush(QBrush(Qt::red));
         painter.setPen(Qt::NoPen);
 
-        fx1 = markerSize;
-        fy1 = 0;
-        fx2 = fx1 + markerSize;
-        fy2 = -markerSize / 2;
-        fx3 = fx1 + markerSize;
-        fy3 = markerSize / 2;
+        constexpr int pointsNum = 3;
+        QPointF points[pointsNum] = { QPointF(markerSize, 0),
+                                      QPointF(doublemarkerSize, -halfMarkerSize),
+                                      QPointF(doublemarkerSize, halfMarkerSize) };
+        painter.drawPolygon(points, pointsNum);
 
-        QPointF points[3] = { QPointF(fx1, fy1), QPointF(fx2, fy2), QPointF(fx3, fy3) };
-        painter.drawPolygon(points, 3);
-
-        QPointF points2[3] = { QPointF(-fx1, fy1), QPointF(-fx2, fy2), QPointF(-fx3, fy3) };
-        painter.drawPolygon(points2, 3);
+        QPointF points2[pointsNum] = { QPointF(-markerSize, 0),
+                                       QPointF(-doublemarkerSize, -halfMarkerSize),
+                                       QPointF(-doublemarkerSize, halfMarkerSize) };
+        painter.drawPolygon(points2, pointsNum);
     }
 
     // draw roll degree lines
     {
-        int nRollLines = 36;
-        float rotAng = 360.0 / nRollLines;
-        int rollLineLeng = m_size / 25;
-        double fx1, fy1, fx2, fy2;
-        int fontSize = 8;
-        QString s;
-
-        blackPen.setWidth(1);
         painter.setPen(blackPen);
-        painter.setFont(QFont("", fontSize));
+        painter.setFont(font);
 
-        for (int i = 0; i < nRollLines; i++)
+        for (int i = 0; i < ROLL_LINES; i++)
         {
-            if (i < nRollLines / 2)
-                s = QString("%1").arg(-i * rotAng);
-            else
-                s = QString("%1").arg(360 - i * rotAng);
+            QString s = (i < ROLL_LINES / 2) ? QString::number(-i * ROT_ANG)
+                                             : QString::number(FULL_CIRCLE - i * ROT_ANG);
 
-            fx1 = 0;
-            fy1 = -m_size / 2 + m_offset;
-            fx2 = 0;
+            double fy1 = -HALF_SIZE + m_offset;
+            double fy2;
 
             if (i % 3 == 0)
             {
-                fy2 = fy1 + rollLineLeng;
-                painter.drawLine(QPointF(fx1, fy1), QPointF(fx2, fy2));
+                fy2 = fy1 + ROLL_LINE_LEN;
+                painter.drawLine(QPointF(0, fy1), QPointF(0, fy2));
 
-                fy2 = fy1 + rollLineLeng + 2;
-                painter.drawText(QRectF(-50, fy2, 100, fontSize + 2), Qt::AlignCenter, s);
+                fy2 = fy1 + ROLL_LINE_LEN + 2;
+                painter.drawText(QRectF(-50, fy2, 100, FONT_SIZE + 2), Qt::AlignCenter, s);
             }
             else
             {
-                fy2 = fy1 + rollLineLeng / 2;
-                painter.drawLine(QPointF(fx1, fy1), QPointF(fx2, fy2));
+                fy2 = fy1 + ROLL_LINE_LEN / 2;
+                painter.drawLine(QPointF(0, fy1), QPointF(0, fy2));
             }
 
-            painter.rotate(rotAng);
+            painter.rotate(ROT_ANG);
         }
     }
 
     // draw roll marker
     {
-        int rollMarkerSize = m_size / 25;
-        double fx1, fy1, fx2, fy2, fx3, fy3;
+        int rollMarkerSize = ROLL_LINE_LEN;
+        int halfRollMarkerSize = rollMarkerSize / 2;
 
         painter.rotate(-m_roll);
         painter.setBrush(QBrush(Qt::black));
 
-        fx1 = 0;
-        fy1 = -m_size / 2 + m_offset;
-        fx2 = fx1 - rollMarkerSize / 2;
-        fy2 = fy1 + rollMarkerSize;
-        fx3 = fx1 + rollMarkerSize / 2;
-        fy3 = fy1 + rollMarkerSize;
-
-        QPointF points[3] = { QPointF(fx1, fy1), QPointF(fx2, fy2), QPointF(fx3, fy3) };
+        QPointF points[3] = { QPointF(0, -HALF_SIZE + m_offset),
+                              QPointF(-halfRollMarkerSize, -HALF_SIZE + m_offset + rollMarkerSize),
+                              QPointF(halfRollMarkerSize, -HALF_SIZE + m_offset + rollMarkerSize) };
         painter.drawPolygon(points, 3);
     }
 }
@@ -290,184 +262,110 @@ void QCompass::paintEvent(QPaintEvent *)
 {
     QPainter painter(this);
 
-    QBrush bgGround(QColor(48, 172, 220));
-
-    QPen whitePen(Qt::white);
-    QPen blackPen(Qt::black);
-    QPen redPen(Qt::red);
-    QPen bluePen(Qt::blue);
-    QPen greenPen(Qt::green);
-
-    whitePen.setWidth(1);
-    blackPen.setWidth(2);
-    redPen.setWidth(2);
-    bluePen.setWidth(2);
-    greenPen.setWidth(2);
+    QPen pen(Qt::white, 1);
+    QFont smallFont("");
+    smallFont.setPointSize(8);
+    QFont bigFont(smallFont);
+    bigFont.setPointSizeF(8 * 1.3);
+    int fontSizePlusTwo = QFontMetrics(smallFont).height() + 2;
 
     painter.setRenderHint(QPainter::Antialiasing);
-
     painter.translate(width() / 2, height() / 2);
 
     // draw background
-    {
-        painter.setPen(blackPen);
-        painter.setBrush(bgGround);
-
-        painter.drawEllipse(-m_size / 2, -m_size / 2, m_size, m_size);
-    }
+    pen.setColor(Qt::black);
+    painter.setPen(pen);
+    painter.setBrush(QColor(48, 172, 220));
+    painter.drawEllipse(-m_size / 2, -m_size / 2, m_size, m_size);
 
     // draw yaw lines
+    QPointF lineStart(0, -m_size / 2 + m_offset);
+    QPointF arrowPoints[3];
+    pen.setWidth(1);
+    painter.setPen(pen);
+
+    for (int i = 0; i < 36; ++i)
     {
-        int nyawLines = 36;
-        float rotAng = 360.0 / nyawLines;
-        int yawLineLeng = m_size / 25;
-        double fx1, fy1, fx2, fy2;
-        int fontSize = 8;
-        QString s;
-
-        blackPen.setWidth(1);
-        painter.setPen(blackPen);
-
-        for (int i = 0; i < nyawLines; i++)
+        QColor color;
+        if (i == 0)
         {
-
-            if (i == 0)
-            {
-                s = "N";
-                painter.setPen(bluePen);
-
-                painter.setFont(QFont("", fontSize * 1.3));
-            }
-            else if (i == 9)
-            {
-                s = "W";
-                painter.setPen(blackPen);
-
-                painter.setFont(QFont("", fontSize * 1.3));
-            }
-            else if (i == 18)
-            {
-                s = "S";
-                painter.setPen(redPen);
-
-                painter.setFont(QFont("", fontSize * 1.3));
-            }
-            else if (i == 27)
-            {
-                s = "E";
-                painter.setPen(blackPen);
-
-                painter.setFont(QFont("", fontSize * 1.3));
-            }
-            else
-            {
-                s = QString("%1").arg(i * rotAng);
-                painter.setPen(blackPen);
-
-                painter.setFont(QFont("", fontSize));
-            }
-
-            fx1 = 0;
-            fy1 = -m_size / 2 + m_offset;
-            fx2 = 0;
-
-            if (i % 3 == 0)
-            {
-                fy2 = fy1 + yawLineLeng;
-                painter.drawLine(QPointF(fx1, fy1), QPointF(fx2, fy2));
-
-                fy2 = fy1 + yawLineLeng + 4;
-                painter.drawText(QRectF(-50, fy2, 100, fontSize + 2), Qt::AlignCenter, s);
-            }
-            else
-            {
-                fy2 = fy1 + yawLineLeng / 2;
-                painter.drawLine(QPointF(fx1, fy1), QPointF(fx2, fy2));
-            }
-
-            painter.rotate(-rotAng);
+            color = Qt::blue;
+            painter.setFont(bigFont);
         }
+        else if (i == 9 || i == 27)
+        {
+            color = Qt::black;
+            painter.setFont(bigFont);
+        }
+        else if (i == 18)
+        {
+            color = Qt::red;
+            painter.setFont(bigFont);
+        }
+        else
+        {
+            color = Qt::black;
+            painter.setFont(smallFont);
+        }
+
+        if (pen.color() != color)
+        {
+            pen.setColor(color);
+            painter.setPen(pen);
+        }
+
+        if (i % 3 == 0)
+        {
+            QPointF lineEnd(0, lineStart.y() + m_size / 25);
+            painter.drawLine(lineStart, lineEnd);
+            painter.drawText(QRectF(-50, lineEnd.y() + 4, 100, fontSizePlusTwo), Qt::AlignCenter,
+                             QString::number(i * 10));
+        }
+        else
+        {
+            painter.drawLine(lineStart, QPointF(0, lineStart.y() + m_size / 50));
+        }
+
+        painter.rotate(-10);
     }
 
     // draw S/N arrow
-    {
-        int arrowWidth = m_size / 5;
-        double fx1, fy1, fx2, fy2, fx3, fy3;
+    arrowPoints[0] = QPointF(0, -m_size / 2 + m_offset + m_size / 25 + 15);
+    arrowPoints[1] = QPointF(-m_size / 10, 0);
+    arrowPoints[2] = QPointF(m_size / 10, 0);
 
-        fx1 = 0;
-        fy1 = -m_size / 2 + m_offset + m_size / 25 + 15;
-        fx2 = -arrowWidth / 2;
-        fy2 = 0;
-        fx3 = arrowWidth / 2;
-        fy3 = 0;
+    painter.setPen(Qt::NoPen);
+    painter.setBrush(Qt::blue);
+    painter.drawPolygon(arrowPoints, 3);
 
-        painter.setPen(Qt::NoPen);
-
-        painter.setBrush(QBrush(Qt::blue));
-        QPointF pointsN[3] = { QPointF(fx1, fy1), QPointF(fx2, fy2), QPointF(fx3, fy3) };
-        painter.drawPolygon(pointsN, 3);
-
-        fx1 = 0;
-        fy1 = m_size / 2 - m_offset - m_size / 25 - 15;
-        fx2 = -arrowWidth / 2;
-        fy2 = 0;
-        fx3 = arrowWidth / 2;
-        fy3 = 0;
-
-        painter.setBrush(QBrush(Qt::red));
-        QPointF pointsS[3] = { QPointF(fx1, fy1), QPointF(fx2, fy2), QPointF(fx3, fy3) };
-        painter.drawPolygon(pointsS, 3);
-    }
+    arrowPoints[0].setY(m_size / 2 - m_offset - m_size / 25 - 15);
+    painter.setBrush(Qt::red);
+    painter.drawPolygon(arrowPoints, 3);
 
     // draw yaw marker
-    {
-        int yawMarkerSize = m_size / 12;
-        double fx1, fy1, fx2, fy2, fx3, fy3;
-
-        painter.rotate(-m_yaw);
-        painter.setBrush(QBrush(QColor(0xFF, 0x00, 0x00, 0xE0)));
-
-        fx1 = 0;
-        fy1 = -m_size / 2 + m_offset;
-        fx2 = fx1 - yawMarkerSize / 2;
-        fy2 = fy1 + yawMarkerSize;
-        fx3 = fx1 + yawMarkerSize / 2;
-        fy3 = fy1 + yawMarkerSize;
-
-        QPointF points[3] = { QPointF(fx1, fy1), QPointF(fx2, fy2), QPointF(fx3, fy3) };
-        painter.drawPolygon(points, 3);
-
-        painter.rotate(m_yaw);
-    }
+    painter.rotate(-m_yaw);
+    painter.setBrush(QColor(0xFF, 0x00, 0x00, 0xE0));
+    arrowPoints[0] = QPointF(0, -m_size / 2 + m_offset);
+    arrowPoints[1] = QPointF(-m_size / 24, arrowPoints[0].y() + m_size / 12);
+    arrowPoints[2] = QPointF(m_size / 24, arrowPoints[1].y());
+    painter.drawPolygon(arrowPoints, 3);
+    painter.rotate(m_yaw);
 
     // draw altitude
-    {
-        int altFontSize = 13;
-        int fx, fy, w, h;
-        QString s;
-        char buf[200];
+    pen.setWidth(2);
+    pen.setColor(Qt::black);
+    painter.setPen(pen);
+    painter.setBrush(Qt::white);
+    painter.setFont(QFont("", 13));
+    QRect altRect(-65, -13 - 8, 130, 2 * (13 + 8));
+    painter.drawRoundedRect(altRect, 6, 6);
 
-        w = 130;
-        h = 2 * (altFontSize + 8);
-        fx = -w / 2;
-        fy = -h / 2;
-
-        blackPen.setWidth(2);
-        painter.setPen(blackPen);
-        painter.setBrush(QBrush(Qt::white));
-        painter.setFont(QFont("", altFontSize));
-
-        painter.drawRoundedRect(fx, fy, w, h, 6, 6);
-
-        painter.setPen(bluePen);
-        sprintf(buf, "ALT: %6.1f m", m_alt);
-        s = buf;
-        painter.drawText(QRectF(fx, fy + 2, w, h / 2), Qt::AlignCenter, s);
-
-        sprintf(buf, "H: %6.1f m", m_h);
-        s = buf;
-        painter.drawText(QRectF(fx, fy + h / 2, w, h / 2), Qt::AlignCenter, s);
-    }
+    pen.setColor(Qt::blue);
+    painter.setPen(pen);
+    painter.drawText(altRect.adjusted(0, 2, 0, -altRect.height() / 2), Qt::AlignCenter,
+                     QString::asprintf("ALT: %6.1f m", m_alt));
+    painter.drawText(altRect.adjusted(0, altRect.height() / 2, 0, 0), Qt::AlignCenter,
+                     QString::asprintf("H: %6.1f m", m_h));
 }
 
 void QCompass::keyPressEvent(QKeyEvent *event)

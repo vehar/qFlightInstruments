@@ -6,6 +6,7 @@
 #include <QWidget>
 #include <QtCore>
 #include <QtGui>
+#include <algorithm>
 
 ////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////
@@ -16,6 +17,8 @@
 class QADI : public QWidget
 {
     Q_OBJECT
+    static constexpr double ROLL_LIM = 180.0;
+    static constexpr double PITCH_LIM = 90.0;
 
 public:
     QADI(QWidget *parent = 0);
@@ -30,14 +33,8 @@ public:
     {
         m_roll = r;
         m_pitch = p;
-        if (m_roll < -180)
-            m_roll = -180;
-        if (m_roll > 180)
-            m_roll = 180;
-        if (m_pitch < -90)
-            m_pitch = -90;
-        if (m_pitch > 90)
-            m_pitch = 90;
+        m_roll = std::clamp(m_roll, -ROLL_LIM, ROLL_LIM);
+        m_pitch = std::clamp(m_pitch, -PITCH_LIM, PITCH_LIM);
 
         emit canvasReplot();
     }
@@ -49,10 +46,7 @@ public:
     void setRoll(double val)
     {
         m_roll = val;
-        if (m_roll < -180)
-            m_roll = -180;
-        if (m_roll > 180)
-            m_roll = 180;
+        m_roll = std::clamp(m_roll, -ROLL_LIM, ROLL_LIM);
 
         emit canvasReplot();
     }
@@ -64,10 +58,7 @@ public:
     void setPitch(double val)
     {
         m_pitch = val;
-        if (m_pitch < -90)
-            m_pitch = -90;
-        if (m_pitch > 90)
-            m_pitch = 90;
+        m_pitch = std::clamp(m_pitch, -PITCH_LIM, PITCH_LIM);
 
         emit canvasReplot();
     }

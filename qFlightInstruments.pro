@@ -10,7 +10,9 @@ QT += core gui widgets
 TARGET = qFlightInstruments
 TEMPLATE = app
 
-QMAKE_CXXFLAGS += -std=c++11
+QMAKE_CXXFLAGS += /std:c++17
+QMAKE_LFLAGS += /std:c++17
+
 
 SOURCES += main.cpp \
         TestWin.cpp \
