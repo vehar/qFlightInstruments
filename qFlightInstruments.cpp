@@ -339,27 +339,30 @@ void QCompass::paintEvent(QPaintEvent *)
     }
 
     // draw S/N arrow
-    arrowPoints[0] = QPointF(0, -m_size / 2 + m_offset + m_size / 25 + 15);
-    arrowPoints[1] = QPointF(-m_size / 10, 0);
-    arrowPoints[2] = QPointF(m_size / 10, 0);
-
+    int arrowSize = 10;
     painter.setPen(Qt::NoPen);
-    painter.setBrush(Qt::blue);
+    arrowPoints[0] = QPointF(0, -m_size / 2 + m_offset + m_size / 25 + 15);
+    arrowPoints[1] = QPointF(-m_size / arrowSize, 0);
+    arrowPoints[2] = QPointF(m_size / arrowSize, 0);
+
+    painter.setBrush(QColor(0x00, 0x00, 0xFF, 0xA0)); // Blue
     painter.drawPolygon(arrowPoints, 3);
 
     arrowPoints[0].setY(m_size / 2 - m_offset - m_size / 25 - 15);
-    painter.setBrush(Qt::red);
+    painter.setBrush(QColor(0xFF, 0x00, 0x00, 0xA0)); // Red
     painter.drawPolygon(arrowPoints, 3);
 
     // draw yaw marker
+    int markerSize = 24;
     painter.rotate(-m_yaw);
-    painter.setBrush(QColor(0xFF, 0x00, 0x00, 0xE0));
+    painter.setBrush(QColor(0xFF, 0x00, 0x00, 0xE0)); // Red
     arrowPoints[0] = QPointF(0, -m_size / 2 + m_offset);
-    arrowPoints[1] = QPointF(-m_size / 24, arrowPoints[0].y() + m_size / 12);
-    arrowPoints[2] = QPointF(m_size / 24, arrowPoints[1].y());
+    arrowPoints[1] = QPointF(-m_size / markerSize, arrowPoints[0].y() + m_size / (markerSize / 2));
+    arrowPoints[2] = QPointF(m_size / markerSize, arrowPoints[1].y());
     painter.drawPolygon(arrowPoints, 3);
     painter.rotate(m_yaw);
 
+#if 0
     // draw altitude
     pen.setWidth(2);
     pen.setColor(Qt::black);
@@ -376,7 +379,7 @@ void QCompass::paintEvent(QPaintEvent *)
                      QString::asprintf("ALT: %6.1f m", m_alt));
     painter.drawText(altRect.adjusted(0, altRect.height() / 2, 0, 0), Qt::AlignCenter,
                      QString::asprintf("H: %6.1f m", m_h));
-
+#endif
     //    m_previousAlt = m_alt;
     //    m_previousH = m_h;
     //    m_previousYaw = m_yaw;
