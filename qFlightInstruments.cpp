@@ -111,14 +111,13 @@ void QADI::paintEvent(QPaintEvent *)
             int y = SIZE_RATIO * p - PITCH_TEM_RATIO;
             int x = l;
 
-            int r = sqrt(x * x + y * y);
-            if (r > HALF_SIZE)
+            if (sqrt(x * x + y * y) > HALF_SIZE) // r
                 continue;
 
             if (i == 0)
             {
                 painter.setPen(pitchZero);
-                l = l * 1.8;
+                l *= 1.8;
             }
             else
             {
@@ -201,32 +200,6 @@ void QADI::paintEvent(QPaintEvent *)
                               QPointF(halfRollMarkerSize, -HALF_SIZE + m_offset + rollMarkerSize) };
         painter.drawPolygon(points, 3);
     }
-}
-
-void QADI::keyPressEvent(QKeyEvent *event)
-{
-    switch (event->key())
-    {
-    case Qt::Key_Left:
-        m_roll -= 1.0;
-        break;
-    case Qt::Key_Right:
-        m_roll += 1.0;
-        break;
-    case Qt::Key_Down:
-        if (m_pitch > -90.)
-            m_pitch -= 1.0;
-        break;
-    case Qt::Key_Up:
-        if (m_pitch < 90.)
-            m_pitch += 1.0;
-        break;
-    default:
-        QWidget::keyPressEvent(event);
-        break;
-    }
-
-    update();
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -362,7 +335,7 @@ void QCompass::paintEvent(QPaintEvent *)
     painter.drawPolygon(arrowPoints, 3);
     painter.rotate(m_yaw);
 
-#if 0
+#ifdef DRAW_ALTITUDE
     // draw altitude
     pen.setWidth(2);
     pen.setColor(Qt::black);
@@ -383,37 +356,6 @@ void QCompass::paintEvent(QPaintEvent *)
     //    m_previousAlt = m_alt;
     //    m_previousH = m_h;
     //    m_previousYaw = m_yaw;
-}
-
-void QCompass::keyPressEvent(QKeyEvent *event)
-{
-    switch (event->key())
-    {
-    case Qt::Key_Left:
-        m_yaw -= 1.0;
-        break;
-    case Qt::Key_Right:
-        m_yaw += 1.0;
-        break;
-    case Qt::Key_Down:
-        m_alt -= 1.0;
-        break;
-    case Qt::Key_Up:
-        m_alt += 1.0;
-        break;
-    case Qt::Key_W:
-        m_h += 1.0;
-        break;
-    case Qt::Key_S:
-        m_h -= 1.0;
-        break;
-
-    default:
-        QWidget::keyPressEvent(event);
-        break;
-    }
-
-    update();
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -451,50 +393,40 @@ QKeyValueListView::~QKeyValueListView() { delete m_mutex; }
 void QKeyValueListView::createOrUpdateItem(int row, int column, const QString &text,
                                            const QColor &foreground, const QColor &background)
 {
-    const int fontSize = 8;
+    const int fontSize = 10;
 
     QTableWidgetItem *item = this->item(row, column);
     if (item != nullptr)
     {
         item->setText(text);
+        return;
     }
-    else
-    {
-        item = new QTableWidgetItem();
-        item->setText(text);
-        item->setForeground(foreground);
-        item->setBackground(background);
-        item->setFont(QFont("", fontSize));
-        this->setItem(row, column, item);
-    }
+
+    item = new QTableWidgetItem(text);
+    item->setForeground(foreground);
+    item->setBackground(background);
+    item->setFont(QFont("", fontSize));
+    this->setItem(row, column, item);
 }
 
 void QKeyValueListView::listUpdate_slot(void)
 {
     QColor clCL1(0x00, 0x00, 0xFF);
     QColor clCL2(0x00, 0x00, 0x00);
-    QColor clB1(0xFF, 0xFF, 0xFF);
+    QColor clB1(0xF0, 0xF0, 0xF0);
     QColor clB2(0xE0, 0xE0, 0xE0);
 
     const int rowHeight = 10;
 
     m_mutex->lock();
-
-    int n = m_data.size();
-    setRowCount(n);
-    setColumnCount(2);
+    setRowCount(m_data.size());
 
     int i = 0;
     for (auto it = m_data.begin(); it != m_data.end(); i++, it++)
     {
         QColor background = (i % 2 == 0) ? clB1 : clB2;
-
-        // set name cell
-        createOrUpdateItem(i, 0, it.key(), clCL1, background);
-
-        // set value cell
-        createOrUpdateItem(i, 1, it.value(), clCL2, background);
-
+        createOrUpdateItem(i, 0, it.key(), clCL1, background);   // set name cell
+        createOrUpdateItem(i, 1, it.value(), clCL2, background); // set value cell
         setRowHeight(i, rowHeight);
     }
 

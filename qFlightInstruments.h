@@ -32,8 +32,9 @@ public:
     void setData(double r, double p)
     {
         m_roll = r;
-        m_pitch = p;
         m_roll = std::clamp(m_roll, -ROLL_LIM, ROLL_LIM);
+
+        m_pitch = p;
         m_pitch = std::clamp(m_pitch, -PITCH_LIM, PITCH_LIM);
 
         emit canvasReplot();
@@ -84,7 +85,6 @@ protected slots:
 protected:
     void paintEvent(QPaintEvent *event);
     void resizeEvent(QResizeEvent *event);
-    void keyPressEvent(QKeyEvent *event);
 
 protected:
     int m_sizeMin, m_sizeMax; ///< widget's min/max size (in pixel)
@@ -103,6 +103,7 @@ protected:
 class QCompass : public QWidget
 {
     Q_OBJECT
+    static constexpr int PI2 = 360;
 
 public:
     QCompass(QWidget *parent = 0);
@@ -122,9 +123,9 @@ public:
         m_h = h;
 
         if (m_yaw < 0)
-            m_yaw = 360 + m_yaw;
-        if (m_yaw > 360)
-            m_yaw = m_yaw - 360;
+            m_yaw += PI2;
+        if (m_yaw > PI2)
+            m_yaw -= PI2;
 
         emit canvasReplot();
     }
@@ -140,9 +141,9 @@ public:
 
         m_yaw = val;
         if (m_yaw < 0)
-            m_yaw = 360 + m_yaw;
-        if (m_yaw > 360)
-            m_yaw = m_yaw - 360;
+            m_yaw += PI2;
+        if (m_yaw > PI2)
+            m_yaw -= PI2;
 
         emit update();
     }
@@ -157,7 +158,6 @@ public:
             return;
 
         m_alt = val;
-
         emit update();
     }
 
@@ -171,7 +171,6 @@ public:
             return;
 
         m_h = val;
-
         emit update();
     }
 
@@ -202,7 +201,6 @@ protected slots:
 protected:
     void paintEvent(QPaintEvent *event);
     void resizeEvent(QResizeEvent *event);
-    void keyPressEvent(QKeyEvent *event);
 
 protected:
     int m_sizeMin, m_sizeMax; ///< widget min/max size (in pixel)
@@ -222,9 +220,7 @@ protected:
 
 typedef QMap<QString, QString> ListMap;
 
-///
 /// \brief The List view class, it will display key-value pair in lines
-///
 class QKeyValueListView : public QTableWidget
 {
 public:
@@ -234,29 +230,19 @@ public:
     QKeyValueListView(QWidget *parent = 0);
     virtual ~QKeyValueListView();
 
-    ///
     /// \brief Set list data
     /// \param d - list data
-    ///
     void setData(ListMap &d)
     {
         m_data = d;
         emit listUpdate();
     }
 
-    ///
     /// \brief Get list data
     /// \param d - list data obj
-    ///
     ListMap &getData(void) { return m_data; }
 
-    void beginSetData(void) { m_mutex->lock(); }
-
-    void endSetData(void) { m_mutex->unlock(); }
-
-    ///
     /// \brief Reloat data to table widget
-    ///
     void listReload(void) { emit listUpdate(); }
 
     void createOrUpdateItem(int row, int column, const QString &text, const QColor &foreground,
